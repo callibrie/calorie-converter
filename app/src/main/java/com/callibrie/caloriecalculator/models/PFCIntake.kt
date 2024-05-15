@@ -1,5 +1,6 @@
 package com.callibrie.caloriecalculator.models
 
+import com.callibrie.caloriecalculator.utility.toNonZeroString
 import kotlin.math.roundToInt
 
 /**
@@ -9,6 +10,10 @@ import kotlin.math.roundToInt
  * Rules:
  * 1) Intake values are rounded to 1 decimal place
  * 2) Calorie values are rounded to an integer
+ *
+ * 「三大栄養素」（PFC）で食べ物を分けます。グラムで計算します。
+ *
+ *
  */
 data class PFCIntake(
     val protein: Float,
@@ -30,6 +35,14 @@ data class PFCIntake(
         return calories.roundToInt()
     }
 
+    fun getStringValues(): PFCStrings {
+        return PFCStrings(
+            proteinInput = this.protein.toNonZeroString(),
+            fatInput = this.fat.toNonZeroString(),
+            carbInput = this.carbohydrates.toNonZeroString()
+        )
+    }
+
     val totalCalories = arrayOf(
         proteinToEnergy(),
         fatToEnergy(),
@@ -46,3 +59,11 @@ enum class Nutrient(val calories: Float) {
     Carbohydrates(4f)
 }
 
+/**
+ * String class for UI
+ */
+data class PFCStrings(
+    val proteinInput: String?,
+    val fatInput: String?,
+    val carbInput: String?
+)
