@@ -16,6 +16,7 @@ import kotlin.math.roundToInt
  *
  */
 data class PFCIntake(
+    val name: String,
     val protein: Float,
     val fat: Float,
     val carbohydrates: Float
@@ -37,9 +38,10 @@ data class PFCIntake(
 
     fun getStringValues(): PFCStrings {
         return PFCStrings(
-            proteinInput = this.protein.toNonZeroString(),
-            fatInput = this.fat.toNonZeroString(),
-            carbInput = this.carbohydrates.toNonZeroString()
+            name = this.name,
+            protein = this.protein.toNonZeroString(),
+            fat = this.fat.toNonZeroString(),
+            carbs = this.carbohydrates.toNonZeroString()
         )
     }
 
@@ -63,7 +65,12 @@ enum class Nutrient(val calories: Float) {
  * String class for UI
  */
 data class PFCStrings(
-    val proteinInput: String?,
-    val fatInput: String?,
-    val carbInput: String?
-)
+    val name: String? = null,
+    val protein: String? = null,
+    val fat: String? = null,
+    val carbs: String? = null,
+    val total: String? = null
+) {
+    fun containsValue() =
+        (!name.isNullOrBlank()) || protein != null || fat != null || carbs != null
+}
