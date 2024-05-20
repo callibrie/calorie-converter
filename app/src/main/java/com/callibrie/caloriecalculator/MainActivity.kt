@@ -3,7 +3,6 @@ package com.callibrie.caloriecalculator
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,8 +11,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
@@ -25,13 +25,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -39,7 +37,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.callibrie.caloriecalculator.models.PFCIntake
 import com.callibrie.caloriecalculator.models.PFCStrings
 import com.callibrie.caloriecalculator.ui.theme.CalorieCalculatorTheme
 
@@ -51,8 +48,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             CalorieCalculatorTheme {
+                val pfcState = viewModel.pfcState.collectAsState()
                 Content(
-                    intake = viewModel.pfcState,
+                    intake = pfcState.value,
+                    displayStrings = viewModel.getSummaryStrings(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
@@ -66,13 +65,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun Content(
     modifier: Modifier = Modifier,
-    intake: PFCIntake,
-    onIntakeUpdate: (PFCIntake) -> Unit
+    intake: List<PFCStrings>,
+    displayStrings: PFCStrings,
+    onIntakeUpdate: (List<PFCStrings>) -> Unit,
 ) {
-    Column(modifier.border(width = 2.dp, color = Color.DarkGray)) {
+    Column(
+        modifier
+            .verticalScroll(rememberScrollState())
+            .border(width = 2.dp, color = Color.DarkGray)
+    ) {
         Header()
-        Display(intake)
-        Form(intake.getStringValues(), onIntakeUpdate)
+        Display(displayStrings)
+        ExpandableInputs(intake, onIntakeUpdate)
     }
 }
 
@@ -91,7 +95,7 @@ fun Header() {
 
 //「PFC」のカロリの価値を表示する
 @Composable
-fun Display(intake: PFCIntake) {
+fun Display(uiStrings: PFCStrings) {
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -102,33 +106,68 @@ fun Display(intake: PFCIntake) {
             text = "Calories From: ",
             fontWeight = FontWeight.Bold
         )
-        ViewItem(
-            icon = Icons.Default.Star,
-            label = "Protein : ",
-            value = intake.proteinToEnergy().toString()
-        )
-        ViewItem(
-            icon = Icons.Default.Favorite,
-            label = "Fat : ",
-            value = intake.fatToEnergy().toString()
-        )
-        ViewItem(
-            icon = Icons.Default.PlayArrow,
-            label = "Carbohydrates : ",
-            value = intake.carbsToEnergy().toString()
-        )
-        Divider()
-        ViewItem(
-            icon = Icons.Default.Person,
-            label = "Total Calories : ",
-            value = intake.totalCalories.toString()
-        )
+        uiStrings.protein?.let {
+            ViewItem(
+                icon = Icons.Default.Star,
+                label = "Protein : ",
+                value = it
+            )
+        }
+        uiStrings.fat?.let {
+            ViewItem(
+                icon = Icons.Default.Favorite,
+                label = "Fat : ",
+                value = it
+            )
+        }
+        uiStrings.carbs?.let {
+            ViewItem(
+                icon = Icons.Default.PlayArrow,
+                label = "Carbohydrates : ",
+                value = it
+            )
+        }
+        uiStrings.total?.let {
+            Divider()
+            ViewItem(
+                icon = Icons.Default.Person,
+                label = "Total Calories : ",
+                value = it
+            )
+        }
     }
 }
 
 @Composable
-fun Form(values: PFCStrings, onIntakeUpdate: (PFCIntake) -> Unit) {
-    var inputs by remember(values) { mutableStateOf(values) }
+fun ExpandableInputs(
+    intakeList: List<PFCStrings>,
+    onIntakeUpdate: (List<PFCStrings>) -> Unit
+) {
+
+    val currentValues = remember { intakeList.toMutableStateList() }
+
+    Button(
+        modifier = Modifier.padding(16.dp),
+        onClick = { currentValues.add(PFCStrings()) }
+    ) { Text("Add Food Component") }
+
+    currentValues.forEachIndexed { index, values ->
+
+        Text(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            text = "Food item ${index + 1}"
+        )
+        Form(values = values) { newValues ->
+            currentValues[index] = newValues
+        }
+        Divider()
+    }
+
+    Submit { onIntakeUpdate(currentValues) }
+}
+
+@Composable
+fun Form(values: PFCStrings, onValueUpdate: (PFCStrings) -> Unit) {
 
     Column(
         Modifier
@@ -137,49 +176,62 @@ fun Form(values: PFCStrings, onIntakeUpdate: (PFCIntake) -> Unit) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        OutlinedTextField(
+            value = values.name.orEmpty(),
+            label = { Text(text = "Food name") },
+            onValueChange = { newName ->
+                println("CAM | name : $newName")
+                onValueUpdate(values.copy(name = newName))
+            })
 
         // Protein(たんぱく質)
         OutlinedTextField(
-            value = inputs.proteinInput.orEmpty(),
+            value = values.protein.orEmpty(),
             label = { Text(text = "Protein (grams)") },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
                 imeAction = ImeAction.Next
             ),
-            onValueChange = { newValue -> inputs = inputs.copy(proteinInput = newValue) }
+            onValueChange = { newValue ->
+                onValueUpdate(values.copy(protein = newValue))
+            }
         )
 
         // Fat(脂質)
         OutlinedTextField(
-            value = inputs.fatInput.orEmpty(),
+            value = values.fat.orEmpty(),
             label = { Text(text = "Fat (grams)") },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
                 imeAction = ImeAction.Next
             ),
-            onValueChange = { newValue -> inputs = inputs.copy(fatInput = newValue) }
+            onValueChange = { newValue ->
+                onValueUpdate(values.copy(fat = newValue))
+            }
         )
 
         // Carbohydrates(炭水化物)
         OutlinedTextField(
-            value = inputs.carbInput.orEmpty(),
+            value = values.carbs.orEmpty(),
             label = { Text(text = "Carbohydrates (grams)") },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
                 imeAction = ImeAction.Done
             ),
-            onValueChange = { newValue -> inputs = inputs.copy(carbInput = newValue) }
+            onValueChange = { newValue ->
+                onValueUpdate(values.copy(carbs = newValue))
+            }
         )
+    }
+}
 
-        // Submit
-        Button(onClick = {
-            val newValues = PFCIntake(
-                protein = inputs.proteinInput?.toFloatOrNull() ?: 0f,
-                fat = inputs.fatInput?.toFloatOrNull() ?: 0f,
-                carbohydrates = inputs.carbInput?.toFloatOrNull() ?: 0f
-            )
-            onIntakeUpdate(newValues)
-        }) { Text(text = "計算する") }
+@Composable
+fun Submit(onButtonClick: () -> Unit) {
+    Button(
+        modifier = Modifier.padding(16.dp),
+        onClick = onButtonClick
+    ) {
+        Text(text = "Calculate")
     }
 }
 
@@ -198,7 +250,8 @@ fun ContentPreview() {
     CalorieCalculatorTheme {
         Content(
             modifier = Modifier,
-            intake = PFCIntake(10.0f, 20f, 30f),
+            intake = listOf(PFCStrings("Foodums", "10.0", "20", "30")),
+            displayStrings = PFCStrings(protein = "100", fat = "200", carbs = "300", total = "600"),
             onIntakeUpdate = {}
         )
     }
