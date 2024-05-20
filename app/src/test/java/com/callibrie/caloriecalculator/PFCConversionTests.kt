@@ -7,6 +7,7 @@ import org.junit.Test
 
 class PFCConversionTests {
     private val testPFC = PFCIntake(
+        name = "food",
         protein = 1.0f,
         fat = 2.0f,
         carbohydrates = 3.0f
@@ -37,7 +38,7 @@ class PFCConversionTests {
     }
 
     @Test
-    fun `Total PFC value computation in accurate`() {
+    fun `Total PFC value computation is accurate`() {
         val expectedValue = expectedCalories.values.sum()
         assertEquals(expectedValue, testPFC.totalCalories)
     }
